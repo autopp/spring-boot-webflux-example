@@ -1,33 +1,36 @@
 package com.example.demo.controller;
 
-import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.List;
+import java.io.IOException;
+import java.io.SequenceInputStream;
+import java.util.Collections;
 
-
-record GreetResponse(String message) {
+record Param(FilePart file) {
 }
 
-record UpperRequest(List<String> words) {
-}
-
-record UpperResponse(List<String> words) {
+record Response(int answer) {
 }
 
 @RestController
 public class HelloController {
-    @GetMapping("/greet")
-    public Mono<GreetResponse> greet() {
-        return Mono.just(new GreetResponse("hello"));
-    }
-
-    @PostMapping("/upper")
-    public Mono<UpperResponse> upper(@RequestBody UpperRequest param) {
-        return Flux.fromIterable(param.words()).map(String::toUpperCase).collectList().map(UpperResponse::new);
+    @PostMapping("/read")
+    public Mono<Response> read(Param param) throws IOException {
+        return param.file().content()
+                .map(DataBuffer::asInputStream)
+                .collectList()
+                .flatMap(list -> {
+                    try (final var is = new SequenceInputStream(Collections.enumeration(list))) {
+                        // Use Input Stream
+                        return Mono.just(new Response(42));
+                    } catch (IOException ex) {
+                        return Mono.error(ex);
+                    }
+                })
+                ;
     }
 }
